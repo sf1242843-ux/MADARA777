@@ -2,7 +2,7 @@
 module.exports = {
 	config: {
 		name: "fakechat",
-		aliases: ["q", "gc"],
+		aliases: ["fk"],
 		author: "Tawsif~",
 		category: "fun",
 		version: "2.5 pro",
