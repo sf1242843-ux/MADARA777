@@ -61,7 +61,7 @@ module.exports = {
       fs.writeFileSync(filePath, response.data);
       
       api.sendMessage(
-        { attachment: fs.createReadStream(filePath), body: "Here's your tokai image 🐸" },
+        { attachment: fs.createReadStream(filePath), body: "Here's your gum image 🐸" },
         threadID,
         () => fs.unlinkSync(filePath),
         messageID
