@@ -108,20 +108,21 @@ dares = [
 ]
 
 def TnD_bot():
-    print("Welcome to Truth & Dare Bot! Type '/Truth' or '/Dare' or 'exit' to quit.")
+    print("🎮 Welcome to Arthur - Truth & Dare Bot! 🎮")
+    print("Type '/Truth' for a truth, '/Dare' for a dare, or 'exit' to quit.\n")
 
     while True:
-        cmd = input("Command: ").strip().lower()
-        
+        cmd = input("Your Command: ").strip().lower()
+
         if cmd == "/truth":
-            print("Truth: " + random.choice(truths))
+            print("\n💡 Truth: " + random.choice(truths) + "\n")
         elif cmd == "/dare":
-            print("Dare: " + random.choice(dares))
+            print("\n🎯 Dare: " + random.choice(dares) + "\n")
         elif cmd == "exit":
-            print("Thanks for playing! Bye!")
+            print("👋 Thanks for playing! Goodbye!")
             break
         else:
-            print("Unknown command. Type '/Truth', '/Dare', or 'exit'.")
+            print("⚠️ Unknown command. Use '/Truth', '/Dare', or 'exit'.\n")
 
 if __name__ == "__main__":
     TnD_bot()
