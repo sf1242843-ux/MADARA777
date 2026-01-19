@@ -1,143 +1,96 @@
-const Canvas = require("canvas");
-const fs = require("fs");
-const path = require("path");
+const axios = require("axios");
 
-module.exports = {
-  config: {
-    name: "bank",
-    aliases: ["register", "identity", "dep", "withdraw", "resetbank"],
-    version: "1.0",
-    author: "ChatGPT",
-    countDown: 5,
-    role: 0,
-    shortDescription: "Bank & Identity System",
-    category: "economy",
-    guide: `
-/register - Register account
-/identity - Show ID card
-/deposit [amount] - Deposit money
-/withdraw [amount] - Withdraw money
-/resetbank @mention - Admin reset bank`
-  },
+// ==== Player Database (in-memory) ====
+const players = {
+  // Example player IDs (Messenger PSID)
+  "12345": { name: "John Doe", age: 16, level: 5, coins: 1500, role: "Warrior" },
+  "67890": { name: "Alice", age: 17, level: 8, coins: 3200, role: "Mage" },
+};
 
-  onStart: async function ({ api, event, args, usersData }) {
-    const userID = event.senderID;
-    const user = await usersData.get(userID);
+// ==== Functions ====
 
-    const command = event.body.split(" ")[0].slice(1).toLowerCase();
+// Get player identity card
+function getPlayerIdentity(playerID) {
+  const player = players[playerID];
+  if (!player) return "❌ Player not found!";
 
-    // -------------------- REGISTER --------------------
-    if (command === "register") {
-      if (user.bankRegistered)
-        return api.sendMessage("❌ You are already registered!", event.threadID);
+  return `
+🛡️ PLAYER IDENTITY CARD 🛡️
 
-      await usersData.set(userID, {
-        bankRegistered: true,
-        bankBalance: 1000,
-        money: 0,
-        exp: 0,
-        name: user.name || "Unknown",
-        gender: user.gender || "Unknown"
-      });
+• Name   : ${player.name}
+• Age    : ${player.age}
+• Level  : ${player.level}
+• Role   : ${player.role}
+• Coins  : 💰 ${player.coins}
 
-      return api.sendMessage(
-        `✅ BANK REGISTRATION SUCCESSFUL!\n🏦 Starting Balance: 1000\nNow you can use /identity`,
-        event.threadID
-      );
-    }
+✨ Keep playing and earn more coins!
+`;
+}
 
-    // -------------------- IDENTITY CARD --------------------
-    if (command === "identity") {
-      if (!user.bankRegistered)
-        return api.sendMessage("❌ You are not registered! Use /register first.", event.threadID);
+// Add coins to player
+function addCoins(playerID, amount) {
+  if (!players[playerID]) return false;
+  players[playerID].coins += amount;
+  return true;
+}
 
-      // Canvas image
-      const canvas = Canvas.createCanvas(600, 350);
-      const ctx = canvas.getContext("2d");
+// Remove coins from player
+function removeCoins(playerID, amount) {
+  if (!players[playerID]) return false;
+  players[playerID].coins = Math.max(0, players[playerID].coins - amount);
+  return true;
+}
 
-      // Background
-      ctx.fillStyle = "#1e1e1e";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+// ==== Messenger Bot Handler ====
+async function handleMessage(sender_psid, received_message) {
+  const text = received_message.text ? received_message.text.toLowerCase() : "";
 
-      // Card border
-      ctx.strokeStyle = "#FFD700";
-      ctx.lineWidth = 6;
-      ctx.strokeRect(0, 0, canvas.width, canvas.height);
+  // Show identity card
+  if (text === ".id" || text === ".profile") {
+    const card = getPlayerIdentity(sender_psid);
+    await sendTextMessage(sender_psid, card);
+  }
 
-      // Text
-      ctx.fillStyle = "#fff";
-      ctx.font = "28px Arial";
-      ctx.fillText("🪪 IDENTITY CARD", 180, 50);
-
-      ctx.font = "22px Arial";
-      ctx.fillText(`Name: ${user.name}`, 50, 120);
-      ctx.fillText(`UID: ${userID}`, 50, 160);
-      ctx.fillText(`Gender: ${user.gender}`, 50, 200);
-      ctx.fillText(`Wallet: ${user.money}`, 50, 240);
-      ctx.fillText(`Bank: ${user.bankBalance}`, 50, 280);
-      ctx.fillText(`EXP: ${user.exp}`, 50, 320);
-
-      // Save image
-      const imagePath = path.join(__dirname, "identity_card.png");
-      const buffer = canvas.toBuffer("image/png");
-      fs.writeFileSync(imagePath, buffer);
-
-      return api.sendMessage(
-        { body: "🖼️ Here is your identity card:", attachment: fs.createReadStream(imagePath) },
-        event.threadID
-      );
-    }
-
-    // -------------------- DEPOSIT --------------------
-    if (command === "deposit") {
-      if (!user.bankRegistered)
-        return api.sendMessage("❌ You are not registered! Use /register first.", event.threadID);
-
-      const amount = parseInt(args[0]);
-      if (!amount || amount <= 0) return api.sendMessage("❌ Invalid amount!", event.threadID);
-      if (user.money < amount) return api.sendMessage("❌ Not enough money in wallet!", event.threadID);
-
-      await usersData.set(userID, {
-        money: user.money - amount,
-        bankBalance: user.bankBalance + amount
-      });
-
-      return api.sendMessage(`✅ Deposited ${amount} to bank!`, event.threadID);
-    }
-
-    // -------------------- WITHDRAW --------------------
-    if (command === "withdraw") {
-      if (!user.bankRegistered)
-        return api.sendMessage("❌ You are not registered! Use /register first.", event.threadID);
-
-      const amount = parseInt(args[0]);
-      if (!amount || amount <= 0) return api.sendMessage("❌ Invalid amount!", event.threadID);
-      if (user.bankBalance < amount) return api.sendMessage("❌ Not enough money in bank!", event.threadID);
-
-      await usersData.set(userID, {
-        money: user.money + amount,
-        bankBalance: user.bankBalance - amount
-      });
-
-      return api.sendMessage(`✅ Withdrawn ${amount} from bank!`, event.threadID);
-    }
-
-    // -------------------- ADMIN RESET --------------------
-    if (command === "resetbank") {
-      const adminIDs = ["123456789"]; // 👈 Replace with admin UID(s)
-      if (!adminIDs.includes(userID)) return api.sendMessage("❌ You are not admin!", event.threadID);
-
-      if (Object.keys(event.mentions).length === 0) return api.sendMessage("❌ Mention a user to reset!", event.threadID);
-
-      const targetID = Object.keys(event.mentions)[0];
-      await usersData.set(targetID, {
-        bankRegistered: false,
-        bankBalance: 0,
-        money: 0,
-        exp: 0
-      });
-
-      return api.sendMessage(`✅ Reset bank for user: ${targetID}`, event.threadID);
+  // Add coins (admin command example)
+  else if (text.startsWith(".addcoins ")) {
+    const amount = parseInt(text.split(" ")[1]);
+    if (addCoins(sender_psid, amount)) {
+      await sendTextMessage(sender_psid, `✅ Added 💰 ${amount} coins!`);
+    } else {
+      await sendTextMessage(sender_psid, "❌ Player not found!");
     }
   }
+
+  // Remove coins (admin command example)
+  else if (text.startsWith(".removecoins ")) {
+    const amount = parseInt(text.split(" ")[1]);
+    if (removeCoins(sender_psid, amount)) {
+      await sendTextMessage(sender_psid, `✅ Removed 💰 ${amount} coins!`);
+    } else {
+      await sendTextMessage(sender_psid, "❌ Player not found!");
+    }
+  }
+}
+
+// ==== Send Message function ====
+async function sendTextMessage(sender_psid, message) {
+  const PAGE_ACCESS_TOKEN = process.env.PAGE_ACCESS_TOKEN;
+
+  const request_body = {
+    recipient: { id: sender_psid },
+    message: { text: message },
+  };
+
+  await axios.post(
+    `https://graph.facebook.com/v17.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`,
+    request_body
+  );
+}
+
+module.exports = {
+  handleMessage,
+  getPlayerIdentity,
+  addCoins,
+  removeCoins,
+  players,
 };
