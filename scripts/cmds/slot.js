@@ -1,32 +1,18 @@
-// =======================================
-// SLOT + BANK + TOP RICHEST (INLINE TITLES)
-// =======================================
+// ==========================
+// SLOT SYSTEM + BANK MANAGER
+// ==========================
 
 const cooldowns = new Map();
-
-// TOP 10 TITLES (ONLY)
-const topTitles = [
-  "👑 Jungle King",
-  "🥈 Silver Tiger",
-  "🥉 Bronze Lion",
-  "🔥 Wild Beast",
-  "🌴 Fruit Master",
-  "🍍 Slot Hunter",
-  "🐒 Jungle Player",
-  "🍌 Lucky Monkey",
-  "🌿 Rising Leaf",
-  "⭐ New Blood"
-];
 
 module.exports = {
   config: {
     name: "slot",
-    version: "13.0",
-    author: "Gemini × GPT-5 (Final Slot Merge)",
-    countDown: 3,
+    version: "9.0",
+    author: "Gemini × GPT-5",
+    countDown: 3, // 3 second cooldown for slot
     role: 0,
-    shortDescription: { en: "🍍 Jungle Slot Machine" },
-    longDescription: { en: "Slot machine with jungle foods, mystery symbol, bank & top richest titles." },
+    shortDescription: { en: "🍉 Food Slot Machine" },
+    longDescription: { en: "Spin the slot machine and manage your unlimited bank." },
     category: "game",
   },
 
@@ -35,171 +21,124 @@ module.exports = {
       invalid_amount: "⚠️ | Enter a valid bet amount.",
       not_enough_money: "💸 | Insufficient balance.",
       spinning: "Final Spin! 🎰\n[ %1 | %2 | %3 ]",
-      win: "You won %1$ 💗\n[ %2 | %3 | %4 ]",
-      jackpot: "🎉 JACKPOT! You won %1$ 💖\n[ %2 | %3 | %4 ]",
-      lose: "You lost %1$ 😢\n[ %2 | %3 | %4 ]",
+      win: "You won %1$💗! Your luck is shining today!\n[ %2 | %3 | %4 ]",
+      jackpot: "🎉 JACKPOT! You won %1$💖\n[ %2 | %3 | %4 ]",
+      lose: "You lost %1$😢. Better luck next time!\n[ %2 | %3 | %4 ]",
 
-      invalid_command: "⚠️ | Usage: /bank <set|add|reset|view>",
+      // BANK COMMANDS
+      invalid_command: "⚠️ | Usage: /bank <set|add|reset|view> <amount>",
       invalid_bank_amount: "⚠️ | Please provide a valid number.",
-      success_set: "✅ Bank set to %1$",
-      success_add: "✅ Added %1$. New balance: %2$",
-      success_reset: "✅ Bank reset to $0.",
-      success_view: "💰 Balance: %1$",
+      success_set: "✅ Your bank balance is now set to %1$",
+      success_add: "✅ Added %1$ to your bank. New balance: %2$",
+      success_reset: "✅ Your bank balance has been reset to $0.",
+      success_view: "💰 Your current bank balance is %1$",
     },
   },
 
   // ====================
-  // SLOT COMMAND
+  // SLOT MACHINE LOGIC
   // ====================
   onStart: async function ({ args, message, event, usersData, getLang, api }) {
     const { senderID } = event;
     const bet = parseInt(args[0]);
 
-    if (isNaN(bet) || bet <= 0)
-      return message.reply(getLang("invalid_amount"));
+    if (isNaN(bet) || bet <= 0) return message.reply(getLang("invalid_amount"));
 
     const user = await usersData.get(senderID);
-    if (bet > user.money)
-      return message.reply(getLang("not_enough_money"));
+    if (bet > user.money) return message.reply(getLang("not_enough_money"));
 
-    // Cooldown
+    // 3-second cooldown
     const now = Date.now();
-    if (cooldowns.has(senderID) && now - cooldowns.get(senderID) < 3000)
-      return message.reply("⏳ Wait 3 seconds between spins.");
+    if (cooldowns.has(senderID) && now - cooldowns.get(senderID) < 3000) {
+      return message.reply("⏳ Please wait 3 seconds between spins.");
+    }
     cooldowns.set(senderID, now);
 
-    const fruits = [
-      "🍌","🍍","🥭","🍉","🍎",
-      "🍊","🍋","🍒","🥥","🥝",
-      "🌽","🍠","🍐","❓"
-    ];
+    const fruits = ["🍎", "🍋", "🍊", "🍒", "🥝"];
 
-    // Medium animation
-    let msg = await message.reply(
-      getLang("spinning", pick(fruits), pick(fruits), pick(fruits))
-    );
-
-    for (let i = 0; i < 5; i++) {
-      await sleep(400);
+    // Smooth spinning animation
+    let msg = await message.reply(getLang("spinning", pick(fruits), pick(fruits), pick(fruits)));
+    for (let i = 0; i < 3; i++) {
+      await sleep(500);
       await api.editMessage(
         getLang("spinning", pick(fruits), pick(fruits), pick(fruits)),
         msg.messageID
       );
     }
 
+    // Controlled win/loss
     let result, winAmount, type;
-    const r = Math.random();
+    const random = Math.random();
 
-    if (r < 0.02) {
-      const s = pick(fruits.filter(f => f !== "❓"));
+    if (random < 0.02) { // Jackpot ~2%
+      const s = pick(fruits);
       result = [s, s, s];
       winAmount = bet * 10;
       type = "jackpot";
-    } else if (r < 0.2) {
+    } else if (random < 0.2) { // Win ~18%
       const s = pick(fruits);
-      let o;
-      do { o = pick(fruits); } while (o === s);
-      result = shuffle([s, s, o]);
+      let other;
+      do { other = pick(fruits); } while (other === s);
+      result = shuffle([s, s, other]);
       winAmount = bet * 2;
       type = "win";
-    } else {
+    } else { // Loss ~80%
       do {
         result = [pick(fruits), pick(fruits), pick(fruits)];
-      } while (
-        result[0] === result[1] ||
-        result[1] === result[2] ||
-        result[0] === result[2]
-      );
+      } while (result[0] === result[1] || result[1] === result[2] || result[0] === result[2]);
       winAmount = -bet;
       type = "lose";
     }
 
-    // Resolve ❓
-    result = result.map(v =>
-      v === "❓" ? pick(fruits.filter(f => f !== "❓")) : v
-    );
-
+    // Update balance
     await usersData.set(senderID, {
       money: user.money + winAmount,
       data: user.data,
     });
 
     await sleep(500);
-    return api.editMessage(
-      getLang(type, Math.abs(winAmount), ...result),
-      msg.messageID
-    );
+
+    return api.editMessage(getLang(type, Math.abs(winAmount), ...result), msg.messageID);
   },
 
   // ====================
-  // BANK COMMAND
+  // BANK COMMAND LOGIC
   // ====================
   onCallBank: async function ({ args, message, event, usersData, getLang }) {
     const { senderID } = event;
     if (!args[0]) return message.reply(getLang("invalid_command"));
 
-    const user = await usersData.get(senderID);
-    const sub = args[0].toLowerCase();
+    const subcommand = args[0].toLowerCase();
+    const userData = await usersData.get(senderID);
 
-    if (sub === "set") {
-      const a = parseInt(args[1]);
-      if (isNaN(a) || a < 0)
-        return message.reply(getLang("invalid_bank_amount"));
-      await usersData.set(senderID, { money: a, data: user.data });
-      return message.reply(getLang("success_set", a.toLocaleString()));
-    }
+    if (subcommand === "set") {
+      const amount = parseInt(args[1]);
+      if (isNaN(amount) || amount < 0) return message.reply(getLang("invalid_bank_amount"));
+      await usersData.set(senderID, { money: amount, data: userData.data });
+      return message.reply(getLang("success_set", amount.toLocaleString()));
 
-    if (sub === "add") {
-      const a = parseInt(args[1]);
-      if (isNaN(a) || a <= 0)
-        return message.reply(getLang("invalid_bank_amount"));
-      const total = user.money + a;
-      await usersData.set(senderID, { money: total, data: user.data });
-      return message.reply(
-        getLang("success_add", a.toLocaleString(), total.toLocaleString())
-      );
-    }
+    } else if (subcommand === "add") {
+      const amount = parseInt(args[1]);
+      if (isNaN(amount) || amount <= 0) return message.reply(getLang("invalid_bank_amount"));
+      const newBalance = userData.money + amount;
+      await usersData.set(senderID, { money: newBalance, data: userData.data });
+      return message.reply(getLang("success_add", amount.toLocaleString(), newBalance.toLocaleString()));
 
-    if (sub === "reset") {
-      await usersData.set(senderID, { money: 0, data: user.data });
+    } else if (subcommand === "reset") {
+      await usersData.set(senderID, { money: 0, data: userData.data });
       return message.reply(getLang("success_reset"));
+
+    } else if (subcommand === "view") {
+      return message.reply(getLang("success_view", userData.money.toLocaleString()));
+
+    } else {
+      return message.reply(getLang("invalid_command"));
     }
-
-    if (sub === "view") {
-      return message.reply(
-        getLang("success_view", user.money.toLocaleString())
-      );
-    }
-
-    return message.reply(getLang("invalid_command"));
-  },
-
-  // ====================
-  // TOP RICHEST COMMAND
-  // ====================
-  onCallTop: async function ({ message, usersData }) {
-    const allUsers = await usersData.getAll();
-
-    const sorted = allUsers
-      .filter(u => typeof u.money === "number")
-      .sort((a, b) => b.money - a.money)
-      .slice(0, 10);
-
-    let msg = "👑 TOP RICHEST USERS 👑\n━━━━━━━━━━━━━━\n";
-
-    sorted.forEach((u, i) => {
-      const name = u.name || "Unknown";
-      const money = formatMoney(u.money);
-      const title = topTitles[i] || "";
-      msg += `${i + 1}. ${name} - ${money} ${title}\n`;
-    });
-
-    return message.reply(msg);
   },
 };
 
 // ====================
-// UTILITIES
+// UTILITY FUNCTIONS
 // ====================
 function pick(arr) {
   return arr[Math.floor(Math.random() * arr.length)];
@@ -212,10 +151,3 @@ function shuffle(arr) {
 function sleep(ms) {
   return new Promise(r => setTimeout(r, ms));
 }
-
-function formatMoney(amount) {
-  if (amount >= 1e9) return (amount / 1e9).toFixed(2) + "B";
-  if (amount >= 1e6) return (amount / 1e6).toFixed(2) + "M";
-  if (amount >= 1e3) return (amount / 1e3).toFixed(2) + "K";
-  return amount.toString();
-        }
