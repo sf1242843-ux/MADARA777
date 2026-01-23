@@ -5,7 +5,7 @@ const { createCanvas } = require("canvas");
 module.exports = {
   config: {
     name: "bank",
-    version: "1.5",
+    version: "1.6",
     description: "Bank system with registration, VIP cards, loans, animated richest list, and bank card images",
     guide: {
       en: "{pn}Bank:\n- Register\n- Deposit\n- Withdraw\n- Balance\n- Interest\n- Transfer\n- Richest\n- Loan\n- PayLoan"
@@ -16,7 +16,7 @@ module.exports = {
     author: "sheikh fahim"
   },
 
-  onStart: async function ({ args, message, event, api, usersData }) {
+  onStart: async function({ args, message, event, api, usersData }) {
     const { getPrefix } = global.utils;
     const p = getPrefix(event.threadID);
 
@@ -246,57 +246,4 @@ async function generateBankCard({ username, balance, vip }) {
   const cardPath = path.join(__dirname, `bankCard_${username}.png`);
   fs.writeFileSync(cardPath, buffer);
   return cardPath;
-}2 Billion)
-function formatNumberWithFullForm(number) {
-  const fullForms = [
-    "",
-    "Thousand",
-    "Million",
-    "Billion",
-    "Trillion",
-    "Quadrillion",
-    "Quintillion",
-    "Sextillion",
-    "Septillion",
-    "Octillion",
-    "Nonillion",
-    "Decillion",
-    "Undecillion",
-    "Duodecillion",
-    "Tredecillion",
-    "Quattuordecillion",
-    "Quindecillion",
-    "Sexdecillion",
-    "Septendecillion",
-    "Octodecillion",
-    "Novemdecillion",
-    "Vigintillion",
-    "Unvigintillion",
-    "Duovigintillion",
-    "Tresvigintillion",
-    "Quattuorvigintillion",
-    "Quinvigintillion",
-    "Sesvigintillion",
-    "Septemvigintillion",
-    "Octovigintillion",
-    "Novemvigintillion",
-    "Trigintillion",
-    "Untrigintillion",
-    "Duotrigintillion",
-    "Googol",
-  ];
-
-  // Calculate the full form of the number (e.g., Thousand, Million, Billion)
-  let fullFormIndex = 0;
-  while (number >= 1000 && fullFormIndex < fullForms.length - 1) {
-    number /= 1000;
-    fullFormIndex++;
-  }
-
-  // Format the number with two digits after the decimal point
-  const formattedNumber = number.toFixed(2);
-
-  // Add the full form to the formatted number
-  return `${formattedNumber} ${fullForms[fullFormIndex]}`;
-                      }
-    
+      }
