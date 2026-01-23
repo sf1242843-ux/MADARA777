@@ -13,7 +13,7 @@ module.exports = {
     category: "💰 Economy",
     countDown: 15,
     role: 0,
-    author: "sheikh fahim"
+    author: "Loufi | SiAM | Samuel\nModified: Shikaki"
   },
 
   onStart: async function({ args, message, event, api, usersData }) {
@@ -33,7 +33,6 @@ module.exports = {
     const amount = parseInt(args[1]);
     const recipientUID = parseInt(args[2]);
 
-    // ---------------- Registration ----------------
     if (command === "register") {
       if (bankData[user]) return message.reply("❌ You already have a bank account!");
       bankData[user] = {
@@ -48,10 +47,8 @@ module.exports = {
       return message.reply("✅ Bank account created! Card: Standard 💳");
     }
 
-    // ---------------- Ensure user is registered ----------------
     if (!bankData[user]) return message.reply(`❌ You don’t have a bank account yet. Type "${p}bank register"`);
 
-    // ---------------- Loan Jail Check ----------------
     if (bankData[user].loanJailUntil && Date.now() < bankData[user].loanJailUntil && !bankData[user].loanPayed) {
       const remaining = bankData[user].loanJailUntil - Date.now();
       const hours = Math.floor(remaining / 3600000);
@@ -59,7 +56,6 @@ module.exports = {
       return message.reply(`⛓️ You are in loan jail! Repay your loan first. Time left: ${hours}h ${minutes}m`);
     }
 
-    // ---------------- Auto VIP ----------------
     if (bankData[user].bank >= 1e9 && !bankData[user].vip) {
       bankData[user].vip = true;
       fs.writeFileSync(bankDataPath, JSON.stringify(bankData), "utf8");
@@ -68,9 +64,7 @@ module.exports = {
     let bankBalance = bankData[user].bank || 0;
     const cardType = bankData[user].vip ? "💎 VIP Card" : "💳 Standard Card";
 
-    // ---------------- Commands ----------------
     switch (command) {
-      // Deposit
       case "deposit":
         if (!amount || amount <= 0) return message.reply("❌ Enter a valid amount to deposit.");
         if (bankBalance >= 1e104) return message.reply("❌ Your bank is full.");
@@ -80,7 +74,6 @@ module.exports = {
         fs.writeFileSync(bankDataPath, JSON.stringify(bankData), "utf8");
         return message.reply(`✅ Deposited $${amount}`);
 
-      // Withdraw
       case "withdraw":
         if (!amount || amount <= 0) return message.reply("❌ Enter a valid amount to withdraw.");
         if (userMoney >= 1e104) return message.reply("❌ Your wallet is full.");
@@ -90,7 +83,6 @@ module.exports = {
         fs.writeFileSync(bankDataPath, JSON.stringify(bankData), "utf8");
         return message.reply(`✅ Withdrew $${amount}`);
 
-      // Balance + Bank Card Image
       case "balance":
         const formattedBalance = formatNumberWithFullForm(bankBalance);
         const cardPath = await generateBankCard({ username, balance: formattedBalance, vip: bankData[user].vip });
@@ -101,7 +93,6 @@ Card: ${cardType}
         api.sendMessage({ attachment: fs.createReadStream(cardPath) }, event.threadID);
         break;
 
-      // Interest
       case "interest":
         const interestRate = 0.001;
         const lastClaimed = bankData[user].lastInterestClaimed || 0;
@@ -119,7 +110,6 @@ Card: ${cardType}
         fs.writeFileSync(bankDataPath, JSON.stringify(bankData), "utf8");
         return message.reply(`✅ Earned interest: $${formatNumberWithFullForm(earned)}`);
 
-      // Transfer
       case "transfer":
         if (!amount || amount <= 0) return message.reply("❌ Enter valid amount");
         if (!recipientUID || !bankData[recipientUID]) return message.reply("❌ Recipient not found");
@@ -130,7 +120,6 @@ Card: ${cardType}
         fs.writeFileSync(bankDataPath, JSON.stringify(bankData), "utf8");
         return message.reply(`✅ Transferred $${amount} to UID: ${recipientUID}`);
 
-      // Richest (animated)
       case "richest":
         const top = Object.entries(bankData).sort(([,a],[,b]) => b.bank - a.bank).slice(0,10);
         const lines = await Promise.all(top.map(async ([id,data], i) => {
@@ -145,7 +134,6 @@ Card: ${cardType}
         message.reply("╚════ஜ۩۞۩ஜ═══╝");
         break;
 
-      // Loan
       case "loan":
         const maxLoan = 100_000_000;
         const currLoan = bankData[user].loan || 0;
@@ -158,7 +146,6 @@ Card: ${cardType}
         fs.writeFileSync(bankDataPath, JSON.stringify(bankData), "utf8");
         return message.reply(`✅ Loan $${amount} taken. Repay in 24h or go to jail`);
 
-      // PayLoan
       case "payloan":
         const loanBal = bankData[user].loan || 0;
         if (!amount || amount <= 0) return message.reply("❌ Enter valid amount");
@@ -180,34 +167,25 @@ Card: ${cardType}
   }
 };
 
-// ---------------- Number Formatter ----------------
 function formatNumberWithFullForm(number) {
-  const fullForms = [
-    "", "Thousand", "Million", "Billion", "Trillion", "Quadrillion",
+  const fullForms = ["", "Thousand", "Million", "Billion", "Trillion", "Quadrillion",
     "Quintillion", "Sextillion", "Septillion", "Octillion", "Nonillion",
     "Decillion", "Undecillion", "Duodecillion", "Tredecillion",
     "Quattuordecillion", "Quindecillion", "Sexdecillion", "Septendecillion",
     "Octodecillion", "Novemdecillion", "Vigintillion", "Unvigintillion",
-    "Googol",
-    "Titanium", "Eternium", "Divinium", "Celestium", "Omnillion",
-    "Apocalyptillion", "Infernium", "Aetherion", "Chronillion", "Infinity"
-  ];
+    "Googol", "Titanium", "Eternium", "Divinium", "Celestium", "Omnillion",
+    "Apocalyptillion", "Infernium", "Aetherion", "Chronillion", "Infinity"];
   let index = 0;
   if (number >= 1e120) return "++++++++";
-  while (number >= 1000 && index < fullForms.length - 1) {
-    number /= 1000;
-    index++;
-  }
+  while (number >= 1000 && index < fullForms.length - 1) { number /= 1000; index++; }
   return `${number.toFixed(2)} ${fullForms[index]}`;
 }
 
-// ---------------- Bank Card Image Generator ----------------
 async function generateBankCard({ username, balance, vip }) {
   const width = 800, height = 500;
   const canvas = createCanvas(width, height);
   const ctx = canvas.getContext("2d");
 
-  // Background
   if (vip) {
     const grad = ctx.createLinearGradient(0,0,width,height);
     grad.addColorStop(0, "#FFD700");
@@ -216,12 +194,10 @@ async function generateBankCard({ username, balance, vip }) {
   } else ctx.fillStyle = "#1E90FF";
   ctx.fillRect(0,0,width,height);
 
-  // Border
   ctx.lineWidth = 10;
   ctx.strokeStyle = vip ? "#FFEA00" : "#FFFFFF";
   ctx.strokeRect(0,0,width,height);
 
-  // Text
   ctx.fillStyle = "#FFFFFF";
   ctx.font = "bold 50px Sans-serif";
   ctx.fillText(vip ? "💎 VIP BANK CARD" : "💳 STANDARD BANK CARD", 50, 80);
@@ -232,7 +208,6 @@ async function generateBankCard({ username, balance, vip }) {
   ctx.font = "bold 35px Sans-serif";
   ctx.fillText(`Card Type: ${vip ? "VIP 💎" : "Standard 💳"}`, 50, 400);
 
-  // Glow effect
   if (vip) {
     ctx.shadowColor = "#FFD700";
     ctx.shadowBlur = 50;
@@ -241,9 +216,8 @@ async function generateBankCard({ username, balance, vip }) {
     ctx.strokeRect(5,5,width-10,height-10);
   }
 
-  // Save
   const buffer = canvas.toBuffer("image/png");
   const cardPath = path.join(__dirname, `bankCard_${username}.png`);
   fs.writeFileSync(cardPath, buffer);
   return cardPath;
-      }
+    }
