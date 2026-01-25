@@ -1,5 +1,5 @@
 // ==========================
-// SLOT MACHINE BOT - slot.js
+// SLOT SYSTEM + BANK MANAGER
 // ==========================
 
 const cooldowns = new Map();
@@ -7,12 +7,12 @@ const cooldowns = new Map();
 module.exports = {
   config: {
     name: "slot",
-    version: "14.1",
-    author: "Gemini × GPT-5 (fixed)",
-    countDown: 3,
+    version: "9.0",
+    author: "Gemini × GPT-5",
+    countDown: 3, // 3 second cooldown for slot
     role: 0,
-    shortDescription: { en: "🍉 Jungle Food Slot Machine" },
-    longDescription: { en: "Spin the slot machine and test your luck with jungle foods." },
+    shortDescription: { en: "🍉 Food Slot Machine" },
+    longDescription: { en: "Spin the slot machine and manage your unlimited bank." },
     category: "game",
   },
 
@@ -20,105 +20,134 @@ module.exports = {
     en: {
       invalid_amount: "⚠️ | Enter a valid bet amount.",
       not_enough_money: "💸 | Insufficient balance.",
-      spinning: "Spinning... 🎰\n[ %1 | %2 | %3 ]",
-      win: "You won %1$ 💗\n[ %2 | %3 | %4 ]",
-      jackpot: "🎉 JACKPOT! You won %1$ 💖\n[ %2 | %3 | %4 ]",
-      lose: "You lost %1$ 😢\n[ %2 | %3 | %4 ]",
-      cooldown: "⏳ Please wait 3 seconds between spins."
+      spinning: "Final Spin! 🎰\n[ %1 | %2 | %3 ]",
+      win: "You won %1$💗! Your luck is shining today!\n[ %2 | %3 | %4 ]",
+      jackpot: "🎉 JACKPOT! You won %1$💖\n[ %2 | %3 | %4 ]",
+      lose: "You lost %1$😢. Better luck next time!\n[ %2 | %3 | %4 ]",
+
+      // BANK COMMANDS
+      invalid_command: "⚠️ | Usage: /bank <set|add|reset|view> <amount>",
+      invalid_bank_amount: "⚠️ | Please provide a valid number.",
+      success_set: "✅ Your bank balance is now set to %1$",
+      success_add: "✅ Added %1$ to your bank. New balance: %2$",
+      success_reset: "✅ Your bank balance has been reset to $0.",
+      success_view: "💰 Your current bank balance is %1$",
     },
   },
 
+  // ====================
+  // SLOT MACHINE LOGIC
+  // ====================
   onStart: async function ({ args, message, event, usersData, getLang, api }) {
-    const senderID = event.senderID;
+    const { senderID } = event;
     const bet = parseInt(args[0]);
 
-    if (!bet || bet <= 0)
-      return message.reply(getLang("invalid_amount"));
+    if (isNaN(bet) || bet <= 0) return message.reply(getLang("invalid_amount"));
 
     const user = await usersData.get(senderID);
-    if (!user || bet > user.money)
-      return message.reply(getLang("not_enough_money"));
+    if (bet > user.money) return message.reply(getLang("not_enough_money"));
 
-    // Cooldown
+    // 3-second cooldown
     const now = Date.now();
-    if (cooldowns.has(senderID) && now - cooldowns.get(senderID) < 3000)
-      return message.reply(getLang("cooldown"));
+    if (cooldowns.has(senderID) && now - cooldowns.get(senderID) < 3000) {
+      return message.reply("⏳ Please wait 3 seconds between spins.");
+    }
     cooldowns.set(senderID, now);
 
-    const fruits = [
-      "🍎","🍋","🍊","🍒","🍍","🥭","🥥","🍇","🍉","🍌",
-      "🥑","🍈","🍐","🍓","🍑","🍏","🥔","🥕","🌽","🍠",
-      "🌶️","🥒","🥬","🍄","🫐","🫛","🥜","🌰","7️⃣"
-    ];
+    const fruits = ["🍎", "🍋", "🍊", "🍒", "🥝"];
 
-    let reels = ["❓", "❓", "❓"];
-    let msg = await message.reply(getLang("spinning", ...reels));
+    // Smooth spinning animation
+    let msg = await message.reply(getLang("spinning", pick(fruits), pick(fruits), pick(fruits)));
+    for (let i = 0; i < 3; i++) {
+      await sleep(500);
+      await api.editMessage(
+        getLang("spinning", pick(fruits), pick(fruits), pick(fruits)),
+        msg.messageID
+      );
+    }
 
-    const spinReel = async (index, times) => {
-      for (let i = 0; i < times; i++) {
-        reels[index] = pick(fruits);
-        await api.editMessage(
-          getLang("spinning", reels[0], reels[1], reels[2]),
-          msg.messageID
-        );
-        await sleep(120);
-      }
-    };
-
-    await Promise.all([
-      spinReel(0, 6),
-      spinReel(1, 8),
-      spinReel(2, 10)
-    ]);
-
+    // Controlled win/loss
     let result, winAmount, type;
-    const r = Math.random();
+    const random = Math.random();
 
-    if (r < 0.01) {
-      result = ["7️⃣", "7️⃣", "7️⃣"];
-      winAmount = bet * 20;
-      type = "jackpot";
-    } else if (r < 0.03) {
+    if (random < 0.02) { // Jackpot ~2%
       const s = pick(fruits);
       result = [s, s, s];
       winAmount = bet * 10;
       type = "jackpot";
-    } else if (r < 0.2) {
+    } else if (random < 0.2) { // Win ~18%
       const s = pick(fruits);
-      let o;
-      do { o = pick(fruits); } while (o === s);
-      result = shuffle([s, s, o]);
+      let other;
+      do { other = pick(fruits); } while (other === s);
+      result = shuffle([s, s, other]);
       winAmount = bet * 2;
       type = "win";
-    } else {
+    } else { // Loss ~80%
       do {
         result = [pick(fruits), pick(fruits), pick(fruits)];
-      } while (new Set(result).size !== 3);
+      } while (result[0] === result[1] || result[1] === result[2] || result[0] === result[2]);
       winAmount = -bet;
       type = "lose";
     }
 
+    // Update balance
     await usersData.set(senderID, {
       money: user.money + winAmount,
       data: user.data,
     });
 
-    await api.editMessage(
-      getLang(type, Math.abs(winAmount), result[0], result[1], result[2]),
-      msg.messageID
-    );
+    await sleep(500);
+
+    return api.editMessage(getLang(type, Math.abs(winAmount), ...result), msg.messageID);
+  },
+
+  // ====================
+  // BANK COMMAND LOGIC
+  // ====================
+  onCallBank: async function ({ args, message, event, usersData, getLang }) {
+    const { senderID } = event;
+    if (!args[0]) return message.reply(getLang("invalid_command"));
+
+    const subcommand = args[0].toLowerCase();
+    const userData = await usersData.get(senderID);
+
+    if (subcommand === "set") {
+      const amount = parseInt(args[1]);
+      if (isNaN(amount) || amount < 0) return message.reply(getLang("invalid_bank_amount"));
+      await usersData.set(senderID, { money: amount, data: userData.data });
+      return message.reply(getLang("success_set", amount.toLocaleString()));
+
+    } else if (subcommand === "add") {
+      const amount = parseInt(args[1]);
+      if (isNaN(amount) || amount <= 0) return message.reply(getLang("invalid_bank_amount"));
+      const newBalance = userData.money + amount;
+      await usersData.set(senderID, { money: newBalance, data: userData.data });
+      return message.reply(getLang("success_add", amount.toLocaleString(), newBalance.toLocaleString()));
+
+    } else if (subcommand === "reset") {
+      await usersData.set(senderID, { money: 0, data: userData.data });
+      return message.reply(getLang("success_reset"));
+
+    } else if (subcommand === "view") {
+      return message.reply(getLang("success_view", userData.money.toLocaleString()));
+
+    } else {
+      return message.reply(getLang("invalid_command"));
+    }
   },
 };
 
-// Utils
+// ====================
+// UTILITY FUNCTIONS
+// ====================
 function pick(arr) {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
 function shuffle(arr) {
-  return [...arr].sort(() => Math.random() - 0.5);
+  return arr.sort(() => Math.random() - 0.5);
 }
 
 function sleep(ms) {
   return new Promise(r => setTimeout(r, ms));
-}
+      }
