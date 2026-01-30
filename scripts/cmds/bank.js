@@ -15,7 +15,7 @@ if (!fs.existsSync(DATA_PATH)) {
 }
 
 /* ========== CONFIG ========== */
-const ADMINS = ["61585911203262"];
+const ADMINS = ["61584661502029"];
 let INTEREST_RATE = 10;
 const FINE_RATE = 5;
 const FREEZE_AFTER = 2;
