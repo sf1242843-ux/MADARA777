@@ -1,168 +1,137 @@
- /**
- * FINAL Ultimate Bank System (STABLE)
- * Data Safe • Auto Backup • No Reset Issue
- * Transaction History • Premium Bank Card
- * Loan • Jail • Freeze • Slot Compatible
- */
-
 const fs = require("fs");
-const DATA_PATH = __dirname + "/bankData.json";
-const BACKUP_PATH = __dirname + "/bankData.backup.json";
-
-/* ========== INIT FILE ========== */
-if (!fs.existsSync(DATA_PATH)) {
-  fs.writeFileSync(DATA_PATH, JSON.stringify({}, null, 2), "utf8");
-}
-
-/* ========== CONFIG ========== */
-const ADMINS = ["61584661502029"];
-let INTEREST_RATE = 10;
-const FINE_RATE = 5;
-const FREEZE_AFTER = 2;
-const JAIL_TIME = 30 * 60 * 1000;
-const MAX_HISTORY = 10;
-
-/* ========== SAFE DATA HANDLER ========== */
-const getData = () => {
-  try {
-    const raw = fs.readFileSync(DATA_PATH, "utf8");
-    if (!raw || raw.trim() === "") return {};
-    return JSON.parse(raw);
-  } catch (e) {
-    console.log("⚠️ Bank data corrupted. Loading backup...");
-    if (fs.existsSync(BACKUP_PATH)) {
-      return JSON.parse(fs.readFileSync(BACKUP_PATH, "utf8"));
-    }
-    return {};
-  }
-};
-
-const saveData = (data) => {
-  try {
-    fs.writeFileSync(DATA_PATH, JSON.stringify(data, null, 2), "utf8");
-    fs.writeFileSync(BACKUP_PATH, JSON.stringify(data, null, 2), "utf8");
-  } catch (e) {
-    console.log("❌ Failed saving bank data", e);
-  }
-};
-
-/* ========== RANK SYSTEM ========== */
-const RANKS = [
-  { name: "Bronze", min: 0, maxLoan: 2000, emoji: "🥉" },
-  { name: "Silver", min: 5000, maxLoan: 5000, emoji: "🥈" },
-  { name: "Gold", min: 20000, maxLoan: 15000, emoji: "🥇" },
-  { name: "Platinum", min: 50000, maxLoan: 30000, emoji: "💎" },
-  { name: "Elite", min: 100000, maxLoan: 60000, emoji: "👑" }
-];
-
-const getRank = (bal) => [...RANKS].reverse().find(r => bal >= r.min);
-
-/* ========== TRANSACTION HISTORY ========== */
-function addHistory(user, text) {
-  if (!user.history) user.history = [];
-  user.history.unshift(`🕒 ${new Date().toLocaleString()} • ${text}`);
-  if (user.history.length > MAX_HISTORY)
-    user.history = user.history.slice(0, MAX_HISTORY);
-}
-
-/* ========== POLICE NOTICE ========== */
-function policeNotice(name, loan, fine, status, due) {
-  return (
-    `🚨🚔 GOVERNMENT POLICE NOTICE 🚔🚨\n` +
-    `━━━━━━━━━━━━━━━━━━\n` +
-    `👤 Name: ${name}\n` +
-    `📂 Case: BANK LOAN DEFAULT\n` +
-    `💳 Due: $${loan}\n` +
-    (fine ? `💸 Fine: $${fine}\n` : "") +
-    `⏰ Deadline: ${due ? new Date(due).toLocaleString() : "N/A"}\n` +
-    `🔒 Status: ${status}\n` +
-    `━━━━━━━━━━━━━━━━━━\n` +
-    `❗ FINAL WARNING`
-  );
-}
+const path = require("path");
 
 module.exports = {
   config: {
     name: "bank",
-    version: "8.1",
-    author: "ADMIN KABIR👑",
-    countDown: 5,
-    shortDescription: { en: "🏦 Premium Bank System (Stable)" },
-    category: "economy"
+    version: "1.2",
+    description: "Deposit or withdraw money from the bank and earn interest",
+    guide: {
+      vi: "",
+      en: "{pn}Bank:\nInterest - Balance\n - Withdraw \n- Deposit \n- Transfer \n- Richest"
+    },
+    category: "💰 Economy",
+    countDown: 15,
+    role: 0,
+    author: "Loufi | SiAM | Samuel\n\nModified: Shikaki"
   },
+  onStart: async function ({ args, message, event, api, usersData }) {
+    const { getPrefix } = global.utils;
+    const p = getPrefix(event.threadID);
 
-  onStart: async function ({ message, event, args, usersData }) {
-    const uid = event.senderID;
-    const now = Date.now();
-    const data = getData();
+    const userMoney = await usersData.get(event.senderID, "money");
+    const user = parseInt(event.senderID);
+    const info = await api.getUserInfo(user);
+    const username = info[user].name;
 
-    if (!data[uid]) {
-      data[uid] = {
-        balance: 0,
-        loan: 0,
-        loanDue: 0,
-        registered: false,
-        warns: 0,
-        frozen: false,
-        jailedUntil: 0,
-        lastWarn: 0,
-        history: []
-      };
-      saveData(data);
-    }
+ const bankDataPath = 'scripts/cmds/bankData.json';
 
-    const user = data[uid];
-    const name = await usersData.getName(uid);
+if (!fs.existsSync(bankDataPath)) {
+  const initialBankData = {};
+  fs.writeFileSync(bankDataPath, JSON.stringify(initialBankData), "utf8");
+}
 
-    /* ========== JAIL CHECK ========== */
-    if (user.jailedUntil && now < user.jailedUntil) {
-      if (!["balance", "repay"].includes(args[0])) {
-        return message.reply(
-          `🚓 POLICE JAIL\n⏳ Remaining: ${Math.ceil((user.jailedUntil - now) / 60000)} min\n🔒 Only balance & repay allowed`
-        );
-      }
-    }
+const bankData = JSON.parse(fs.readFileSync(bankDataPath, "utf8"));
 
-    /* ========== REGISTER ========== */
-    if (args[0] === "register") {
-      if (user.registered) return message.reply("❌ Already registered.");
-      user.registered = true;
-      user.balance = 1000;
-      addHistory(user, "🏦 Account registered (+$1000)");
-      saveData(data);
-      return message.reply("🏦 Bank account created\n💰 Bonus: $1000");
-    }
+if (!bankData[user]) {
+  bankData[user] = { bank: 0, lastInterestClaimed: Date.now() };
+  fs.writeFileSync(bankDataPath, JSON.stringify(bankData), "utf8");
+}
 
-    if (!user.registered)
-      return message.reply("⚠️ Use `bank register` first");
 
-    /* ========== AUTO JAIL ========== */
-    if (user.loan > 0 && user.loanDue && now > user.loanDue && !user.jailedUntil) {
-      user.jailedUntil = now + JAIL_TIME;
-      user.frozen = true;
-      addHistory(user, "🚓 Arrested for loan default");
-      saveData(data);
-      return message.reply("🚓 ARRESTED\n⛓ Jail Time: 30 minutes");
-    }
+  bankBalance = bankData[user].bank || 0;
 
-    /* ========== WARNING & FINE ========== */
-    if (user.loan > 0 && user.balance < user.loan * 0.3) {
-      if (now - user.lastWarn > 6 * 60 * 60 * 1000) {
-        user.lastWarn = now;
-        user.warns++;
+  const command = args[0]?.toLowerCase();
+  const amount = parseInt(args[1]);
+  const recipientUID = parseInt(args[2]);
 
-        let fine = 0;
-        if (user.warns >= 2) {
-          fine = Math.floor((user.loan * FINE_RATE) / 100);
-          user.loan += fine;
-          addHistory(user, `💸 Police fine added $${fine}`);
-        }
+    switch (command) {
+case "deposit":
+  if (isNaN(amount) || amount <= 0) {
+    return message.reply("╔════ஜ۩۞۩ஜ═══╗\n\n[🏦 Bank 🏦]\n\n❏Please enter a valid amount to deposit 🔁•\n\n╚════ஜ۩۞۩ஜ═══╝");
+  }
 
-        if (user.warns >= FREEZE_AFTER) user.frozen = true;
-        saveData(data);
 
-        return message.reply(
-          policeNotice(
-            name,
-            user.loan,
-        
+  if (bankBalance >= 1e104) {
+    return message.reply("╔════ஜ۩۞۩ஜ═══╗\n\n[🏦 Bank 🏦]\n\n❏You cannot deposit money when your bank balance is already at $1e104 ✖️•\n\n╚════ஜ۩۞۩ஜ═══╝");
+  }
+
+  if (userMoney < amount) {
+    return message.reply("╔════ஜ۩۞۩ஜ═══╗\n\n[🏦 Bank 🏦]\n\n❏You don't have the required amount to deposit ✖️•\n\n╚════ஜ۩۞۩ஜ═══╝");
+  }
+
+  bankData[user].bank += amount;
+  await usersData.set(event.senderID, {
+    money: userMoney - amount
+  });
+fs.writeFileSync(bankDataPath, JSON.stringify(bankData), "utf8");
+
+  return message.reply(`╔════ஜ۩۞۩ஜ═══╗\n\n[🏦 Bank 🏦]\n\n❏Successfully deposited $${amount} into your bank account ✅•\n\n╚════ஜ۩۞۩ஜ═══╝`);
+break;
+
+
+case "withdraw":
+  const balance = bankData[user].bank || 0;
+
+  if (isNaN(amount) || amount <= 0) {
+    return message.reply("╔════ஜ۩۞۩ஜ═══╗\n\n[🏦 Bank 🏦]\n\n❏Please enter the correct amount to withdraw 😪•\n\n╚════ஜ۩۞۩ஜ═══╝");
+  }
+
+  if (userMoney >= 1e104) {
+    return message.reply("╔════ஜ۩۞۩ஜ═══╗\n\n[🏦 Bank 🏦]\n\n❏You cannot withdraw money when your balance is already at 1e104 😒•\n\n╚════ஜ۩۞۩ஜ═══╝");
+  }
+
+  if (amount > balance) {
+    return message.reply("╔════ஜ۩۞۩ஜ═══╗\n\n[🏦 Bank 🏦]\n\n❏The requested amount is greater than the available balance in your bank account 🗿•\n\n╚════ஜ۩۞۩ஜ═══╝");
+  }
+
+  // Continue with the withdrawal if the userMoney is not at 1e104
+  bankData[user].bank = balance - amount;
+  await usersData.set(event.senderID, {
+    money: userMoney + amount
+  });
+fs.writeFileSync(bankDataPath, JSON.stringify(bankData), "utf8");
+  return message.reply(`╔════ஜ۩۞۩ஜ═══╗\n\n[🏦 Bank 🏦]\n\n❏Successfully withdrew $${amount} from your bank account ✅•\n\n╚════ஜ۩۞۩ஜ═══╝`);
+  break;
+
+
+case "balance":
+  const formattedBankBalance = parseFloat(bankBalance);
+  if (!isNaN(formattedBankBalance)) {
+    return message.reply(`╔════ஜ۩۞۩ஜ═══╗\n\n[🏦 Bank 🏦]\n\n❏Your bank balance is: $${formatNumberWithFullForm(formattedBankBalance)}\n\n╚════ஜ۩۞۩ஜ═══╝`);
+  } else {
+    return message.reply("╔════ஜ۩۞۩ஜ═══╗\n\n[🏦 Bank 🏦]\n\n❏Error: Your bank balance is not a valid number 🥲•\n\n╚════ஜ۩۞۩ஜ═══╝");
+  }
+  break;
+
+
+
+case "interest":
+  const interestRate = 0.001; // 0.1% daily interest rate
+  const lastInterestClaimed = bankData[user].lastInterestClaimed || 0;
+
+  const currentTime = Date.now();
+  const timeDiffInSeconds = (currentTime - lastInterestClaimed) / 1000;
+
+  if (timeDiffInSeconds < 86400) {
+    // If it's been less than 24 hours since the last interest claim
+    const remainingTime = Math.ceil(86400 - timeDiffInSeconds);
+    const remainingHours = Math.floor(remainingTime / 3600);
+    const remainingMinutes = Math.floor((remainingTime % 3600) / 60);
+
+    return message.reply(`╔════ஜ۩۞۩ஜ═══╗\n\n[🏦 Bank 🏦]\n\n❏You can claim interest again in ${remainingHours} hours and ${remainingMinutes} minutes 😉•\n\n╚════ஜ۩۞۩ஜ═══╝`);
+  }
+
+  const interestEarned = bankData[user].bank * (interestRate / 970) * timeDiffInSeconds;
+
+  if (bankData[user].bank <= 0) {
+        return message.reply("╔════ஜ۩۞۩ஜ═══╗\n\n[🏦 Bank 🏦]\n\n❏You don't have any money in your bank account to earn interest 💸🥱•\n\n╚════ஜ۩۞۩ஜ═══╝");
+  }
+
+  bankData[user].lastInterestClaimed = currentTime;
+  bankData[user].bank += interestEarned;
+
+fs.writeFileSync(bankDataPath, JSON.stringify(bankData), "utf8");
+
+
+return message.reply(`╔════ஜ۩۞۩ஜ═══╗\n\n[🏦 Bank 🏦]\n\n❏You have earned interest of $${formatNumberW
