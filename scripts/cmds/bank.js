@@ -13,7 +13,7 @@ const path = __dirname + "/bankData.json";
 if (!fs.existsSync(path)) fs.writeFileSync(path, JSON.stringify({}, null, 2));
 
 /* ========== CONFIG ========== */
-const ADMINS = ["61585966465927"]; // 🔴 YOUR UID
+const ADMINS = ["61584661502029"]; // 🔴 YOUR UID
 let INTEREST_RATE = 10;
 const FINE_RATE = 5;
 const FREEZE_AFTER = 2;
